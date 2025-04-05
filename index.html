@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>跨平台贪吃蛇</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #2c3e50;
+            touch-action: none;
+        }
+
+        #gameCanvas {
+            border: 2px solid #ecf0f1;
+            margin-top: 20px;
+        }
+
+        /* 虚拟方向键样式 */
+        .virtual-controls {
+            position: fixed;
+            bottom: 30px;
+            width: 150px;
+            height: 150px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5px;
+            touch-action: none;
+        }
+
+        .control-btn {
+            background: rgba(236, 240, 241, 0.7);
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            opacity: 0.8;
+        }
+
+        .control-btn:active {
+            background: #bdc3c7;
+        }
+
+        #upBtn { grid-column: 2 / 3; }
+        #leftBtn { grid-column: 1 / 2; grid-row: 2 / 3; }
+        #rightBtn { grid-column: 3 / 4; grid-row: 2 / 3; }
+        #downBtn { grid-column: 2 / 3; grid-row: 3 / 4; }
+
+        /* PC端隐藏虚拟按键 */
+        @media (min-width: 768px) {
+            .virtual-controls {
+                display: none;
+            }
+        }
+
+        #score {
+            color: #ecf0f1;
+            font-family: Arial;
+            font-size: 24px;
+            margin: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="score">得分: 0</div>
+    <canvas id="gameCanvas"></canvas>
+    
+    <!-- 移动端虚拟方向键 -->
+    <div class="virtual-controls">
+        <button id="upBtn" class="control-btn" ontouchstart="changeDirection('up')">↑</button>
+        <button id="leftBtn" class="control-btn" ontouchstart="changeDirection('left')">←</button>
+        <button id="rightBtn" class="control-btn" ontouchstart="changeDirection('right')">→</button>
+        <button id="downBtn" class="control-btn" ontouchstart="changeDirection('down')">↓</button>
+    </div>
+
+    <button id="restartBtn">重新开始</button>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const restartBtn = document.getElementById('restartBtn');
+        
+        // 游戏参数
+        const gridSize = 20;
+        let score = 0;
+        let gameSpeed = 100;
+        let direction = 'right';
+        let nextDirection = 'right';
+        let snake = [{x: 5, y: 5}];
+        let food = generateFood();
+
+        // 初始化画布尺寸
+        function initCanvas() {
+            const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+            canvas.width = isMobile ? window.innerWidth - 20 : 400;
+            canvas.height = isMobile ? window.innerHeight - 200 : 400;
+        }
+        initCanvas();
+        window.addEventListener('resize', initCanvas);
+
+        // 生成食物
+        function generateFood() {
+            const maxPos = Math.floor(canvas.width / gridSize) - 1;
+            return {
+                x: Math.floor(Math.random() * maxPos),
+                y: Math.floor(Math.random() * maxPos)
+            };
+        }
+
+        // 方向控制
+        function changeDirection(newDir) {
+            const oppositeDirs = {
+                up: 'down', down: 'up',
+                left: 'right', right: 'left'
+            };
+            if (newDir !== oppositeDirs[direction]) {
+                nextDirection = newDir;
+            }
+        }
+
+        // 游戏循环
+        function gameLoop() {
+            direction = nextDirection;
+            const head = {...snake[0]};
+
+            switch(direction) {
+                case 'up': head.y--; break;
+                case 'down': head.y++; break;
+                case 'left': head.x--; break;
+                case 'right': head.x++; break;
+            }
+
+            // 碰撞检测
+            const maxPos = canvas.width / gridSize;
+            if (head.x < 0 || head.x >= maxPos || 
+                head.y < 0 || head.y >= maxPos ||
+                snake.some(segment => segment.x === head.x && segment.y === head.y)) {
+                alert('游戏结束！得分: ' + score);
+                resetGame();
+                return;
+            }
+
+            snake.unshift(head);
+
+            // 吃食物
+            if (head.x === food.x && head.y === food.y) {
+                score += 10;
+                scoreElement.textContent = `得分: ${score}`;
+                gameSpeed = Math.max(50, gameSpeed - 2);
+                food = generateFood();
+            } else {
+                snake.pop();
+            }
+
+            draw();
+            setTimeout(gameLoop, gameSpeed);
+        }
+
+        // 绘制游戏
+        function draw() {
+            ctx.fillStyle = '#2c3e50';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 绘制蛇
+            snake.forEach((segment, index) => {
+                ctx.fillStyle = index === 0 ? '#e74c3c' : '#2ecc71';
+                ctx.fillRect(
+                    segment.x * gridSize,
+                    segment.y * gridSize,
+                    gridSize - 1,
+                    gridSize - 1
+                );
+            });
+
+            // 绘制食物
+            ctx.fillStyle = '#f1c40f';
+            ctx.fillRect(
+                food.x * gridSize,
+                food.y * gridSize,
+                gridSize - 1,
+                gridSize - 1
+            );
+        }
+
+        // 重置游戏
+        function resetGame() {
+            snake = [{x: 5, y: 5}];
+            score = 0;
+            gameSpeed = 100;
+            direction = 'right';
+            nextDirection = 'right';
+            food = generateFood();
+            scoreElement.textContent = '得分: 0';
+            
+            // 重新启动游戏循环
+            setTimeout(gameLoop, gameSpeed);
+        }
+
+        // 事件监听
+        document.addEventListener('keydown', (e) => {
+            const keyMap = {
+                ArrowUp: 'up',
+                ArrowDown: 'down',
+                ArrowLeft: 'left',
+                ArrowRight: 'right'
+            };
+            if (keyMap[e.key]) {
+                e.preventDefault();
+                changeDirection(keyMap[e.key]);
+            }
+        });
+
+        // 添加重新开始按钮的事件监听
+        restartBtn.addEventListener('click', resetGame);
+
+        // 启动游戏
+        gameLoop();
+    </script>
+</body>
+</html>
